@@ -4,23 +4,227 @@
   "version": "1.0",
   "author": "Normal48",
   "description": "Визуалы: хрома-скин, трейл, FOV. А еще я рыбу не люблю",
-  "libs": ["libs/arm64-v8a/libfishvisuals.so"],
+  "libs": [
+    "libs/arm64-v8a/libfishvisuals.so"
+  ],
   "settings": [
-    { "id": "enable_chroma", "type": "bool", "name": "Хрома-скин (Радуга)", "default": false },
-    { "id": "chroma_speed", "type": "float", "name": "Скорость радуги", "min": 0.5, "max": 5.0, "default": 2.0, "control": "slider" },
-    { "id": "enable_trail", "type": "bool", "name": "Трейл", "default": true },
-    { "id": "trail_texture", "type": "choice", "name": "Текстура трейла", "default": "bubbles", "options": ["bubbles", "fire", "stars", "hearts", "rainbow"] },
-    { "id": "trail_width", "type": "float", "name": "Ширина трейла", "min": 0.1, "max": 2.0, "default": 0.5, "control": "slider" },
-    { "id": "trail_time", "type": "float", "name": "Время жизни трейла", "min": 0.1, "max": 3.0, "default": 1.0, "control": "slider" },
-    { "id": "enable_fov", "type": "bool", "name": "Свой FOV", "default": false },
-    { "id": "custom_fov", "type": "float", "name": "Значение FOV", "min": 60.0, "max": 110.0, "default": 75.0, "control": "slider" }
+    {
+      "id": "enable_chroma",
+      "type": "bool",
+      "name": "Хрома-скин (Радуга)",
+      "default": false
+    },
+    {
+      "id": "chroma_speed",
+      "type": "float",
+      "name": "Скорость радуги",
+      "min": 0.5,
+      "max": 5.0,
+      "default": 2.0,
+      "control": "slider"
+    },
+    {
+      "id": "enable_trail",
+      "type": "bool",
+      "name": "Трейл",
+      "default": true
+    },
+    {
+      "id": "trail_texture",
+      "type": "choice",
+      "name": "Текстура трейла",
+      "default": "bubbles",
+      "options": [
+        "bubbles",
+        "fire",
+        "stars",
+        "hearts",
+        "rainbow"
+      ]
+    },
+    {
+      "id": "trail_width",
+      "type": "float",
+      "name": "Ширина трейла",
+      "min": 0.1,
+      "max": 2.0,
+      "default": 0.5,
+      "control": "slider"
+    },
+    {
+      "id": "trail_time",
+      "type": "float",
+      "name": "Время жизни трейла",
+      "min": 0.1,
+      "max": 3.0,
+      "default": 1.0,
+      "control": "slider"
+    },
+    {
+      "id": "enable_fov",
+      "type": "bool",
+      "name": "Свой FOV",
+      "default": false
+    },
+    {
+      "id": "custom_fov",
+      "type": "float",
+      "name": "Значение FOV",
+      "min": 60.0,
+      "max": 110.0,
+      "default": 75.0,
+      "control": "slider"
+    },
+    {
+      "id": "big_head",
+      "type": "bool",
+      "name": "Большая голова",
+      "default": false
+    },
+    {
+      "id": "head_scale",
+      "type": "float",
+      "name": "Размер головы",
+      "min": 0.5,
+      "max": 5.0,
+      "default": 2.5,
+      "control": "slider"
+    },
+    {
+      "id": "body_spin",
+      "type": "bool",
+      "name": "Крутить тело",
+      "default": false
+    },
+    {
+      "id": "head_spin",
+      "type": "bool",
+      "name": "Голова-экзорциста",
+      "default": false
+    },
+    {
+      "id": "shicka_copter",
+      "type": "bool",
+      "name": "Шика-вертолёт",
+      "default": false
+    },
+    {
+      "id": "spin_speed",
+      "type": "float",
+      "name": "Скорость вращения",
+      "min": 1.0,
+      "max": 20.0,
+      "default": 6.0,
+      "control": "slider"
+    },
+    {
+      "id": "jelly",
+      "type": "bool",
+      "name": "Резиновый медведь",
+      "default": false
+    },
+    {
+      "id": "disco_sky",
+      "type": "bool",
+      "name": "Диско-небо",
+      "default": false
+    },
+    {
+      "id": "disco_speed",
+      "type": "float",
+      "name": "Скорость диско",
+      "min": 0.5,
+      "max": 5.0,
+      "default": 2.0,
+      "control": "slider"
+    },
+    {
+      "id": "drunk_fov",
+      "type": "bool",
+      "name": "Пьяный FOV",
+      "default": false
+    }
   ],
   "hud": [
-    { "label": "Хрома", "setting": "enable_chroma", "action": "toggle", "pos": "right" },
-    { "label": "Трейл", "setting": "enable_trail", "action": "toggle", "pos": "right" },
-    { "label": "Текстура", "setting": "trail_texture", "action": "cycle", "pos": "right" },
-    { "label": "FOV", "setting": "enable_fov", "action": "toggle", "pos": "right" },
-    { "label": "FOV+", "setting": "custom_fov", "action": "step", "step": 5, "pos": "right" },
-    { "label": "FOV-", "setting": "custom_fov", "action": "step", "step": -5, "pos": "right" }
+    {
+      "label": "Хрома",
+      "setting": "enable_chroma",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Трейл",
+      "setting": "enable_trail",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Текстура",
+      "setting": "trail_texture",
+      "action": "cycle",
+      "pos": "right"
+    },
+    {
+      "label": "FOV",
+      "setting": "enable_fov",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "FOV+",
+      "setting": "custom_fov",
+      "action": "step",
+      "step": 5,
+      "pos": "right"
+    },
+    {
+      "label": "FOV-",
+      "setting": "custom_fov",
+      "action": "step",
+      "step": -5,
+      "pos": "right"
+    },
+    {
+      "label": "Голова",
+      "setting": "big_head",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Спин",
+      "setting": "body_spin",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Экзорц.",
+      "setting": "head_spin",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Шика",
+      "setting": "shicka_copter",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Желе",
+      "setting": "jelly",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Диско",
+      "setting": "disco_sky",
+      "action": "toggle",
+      "pos": "right"
+    },
+    {
+      "label": "Пьяный",
+      "setting": "drunk_fov",
+      "action": "toggle",
+      "pos": "right"
+    }
   ]
 }
