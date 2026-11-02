@@ -9,7 +9,14 @@
 #include <math.h>
 
 typedef struct { float r, g, b, a; } Color;
+typedef struct { float x, y, z; } Vec3;
+typedef void (*tr_vec3_fn)(void*, Vec3, const void*);   /* Transform.set_localEulerAngles / set_localScale */
+typedef void (*set_ambient_fn)(Color, const void*);     /* static RenderSettings.set_ambient*Color */
 typedef void (*set_color_fn)(void*, Color, const void*);
+typedef void* (*shader_find_fn)(const void*, const void*);   /* static Shader.Find(string) */
+typedef void* (*instantiate_fn)(void*, const void*);         /* static Object.Instantiate(Object) */
+typedef void  (*set_shader_fn)(void*, void*, const void*);   /* Material.set_shader */
+typedef void  (*set_material_fn)(void*, void*, const void*); /* Renderer.set_material */
 typedef void (*set_float_fn)(void*, float, const void*);
 typedef void* (*get_obj_fn)(void*, const void*);
 typedef void* (*go_type_fn)(void*, void*, const void*);
@@ -29,6 +36,10 @@ static void* mi_trail_startwidth;
 static void* mi_trail_endwidth;
 static void* mi_trail_startcolor;
 static void* mi_trail_endcolor;
+static void* mi_shader_find;
+static void* mi_object_instantiate;
+static void* mi_mat_setshader;
+static void* mi_trail_setmaterial;
 
 static set_color_fn    fn_set_color;
 static get_obj_fn      fn_get_gameobject;
@@ -39,11 +50,31 @@ static set_float_fn    fn_trail_startwidth;
 static set_float_fn    fn_trail_endwidth;
 static set_color_fn    fn_trail_startcolor;
 static set_color_fn    fn_trail_endcolor;
+static shader_find_fn   fn_shader_find;
+static instantiate_fn   fn_object_instantiate;
+static set_shader_fn    fn_mat_setshader;
+static set_material_fn  fn_trail_setmaterial;
 
-static void* g_trail_type;   
-static void* g_trail;        
-static long  g_tick;         
+static void* g_trail_type;   /* System.Type объекта TrailRenderer */
+static void* g_trail;        /* TrailRenderer локального игрока */
+static int   g_trail_mat_done; /* материал трейлу уже назначен */
+static long  g_tick;         /* счётчик тиков для периодического переполучения трейла */
 static float g_hue;
+static float g_spin_angle;   /* накопленный угол вращений */
+static float g_disco_hue;    /* фаза диско-неба */
+static float g_jelly_t;      /* фаза резинового медведя */
+static int   g_head_scaled;  /* голова сейчас увеличена (для восстановления) */
+
+static void* mi_tr_set_euler;
+static void* mi_tr_set_scale;
+static void* mi_set_sky;
+static void* mi_set_equator;
+static void* mi_set_ground;
+static tr_vec3_fn   fn_tr_set_euler;
+static tr_vec3_fn   fn_tr_set_scale;
+static set_ambient_fn fn_set_sky;
+static set_ambient_fn fn_set_equator;
+static set_ambient_fn fn_set_ground;
 
 static Color hsv2rgb(float h) {
     float f = h * 6.f - (float)(int)(h * 6.f);
@@ -59,16 +90,92 @@ static Color hsv2rgb(float h) {
     return c;
 }
 
+/* выбор trail_texture — это цветовой пресет; настоящие текстуры требуют ассетов игры */
 static Color trail_color(const char* name) {
     if (!strcmp(name, "fire"))    return (Color){1.f, 0.35f, 0.05f, 1.f};
     if (!strcmp(name, "stars"))   return (Color){1.f, 0.9f,  0.2f,  1.f};
     if (!strcmp(name, "hearts"))  return (Color){1.f, 0.2f,  0.45f, 1.f};
     if (!strcmp(name, "rainbow")) return hsv2rgb(g_hue);
-    return (Color){0.45f, 0.85f, 1.f, 1.f};  
+    return (Color){0.45f, 0.85f, 1.f, 1.f};   /* bubbles */
+}
+
+static void crazy_tick(void* cosmetics, float dt) {
+    double spin_spd = g_api->get_float(g_id, "spin_speed", 6.0);
+
+    void* head   = *(void**)((char*)cosmetics + 0x38);
+    void* body   = *(void**)((char*)cosmetics + 0x40);
+    void* shicka = *(void**)((char*)cosmetics + 0x48);
+
+    /* БОЛЬШАЯ ГОЛОВА */
+    int big_head = g_api->get_bool(g_id, "big_head", 0);
+    if (big_head && head && fn_tr_set_scale) {
+        float s = (float)g_api->get_float(g_id, "head_scale", 2.5f);
+        fn_tr_set_scale(head, (Vec3){s, s, s}, mi_tr_set_scale);
+        g_head_scaled = 1;
+    } else if (!big_head && g_head_scaled && head && fn_tr_set_scale) {
+        fn_tr_set_scale(head, (Vec3){1, 1, 1}, mi_tr_set_scale);
+        g_head_scaled = 0;
+    }
+
+    /* ВРАЩЕНИЯ: тело / голова-экзорциста / шика-вертолёт */
+    if (fn_tr_set_euler) {
+        int any_spin = g_api->get_bool(g_id, "body_spin", 0)
+                     | g_api->get_bool(g_id, "head_spin", 0)
+                     | g_api->get_bool(g_id, "shicka_copter", 0);
+        if (any_spin) g_spin_angle += (float)(6.0 * spin_spd) * dt;
+        if (g_api->get_bool(g_id, "body_spin", 0) && body)
+            fn_tr_set_euler(body, (Vec3){0, g_spin_angle, 0}, mi_tr_set_euler);
+        if (g_api->get_bool(g_id, "head_spin", 0) && head)
+            fn_tr_set_euler(head, (Vec3){0, 0, g_spin_angle * 1.5f}, mi_tr_set_euler);
+        if (g_api->get_bool(g_id, "shicka_copter", 0) && shicka)
+            fn_tr_set_euler(shicka, (Vec3){0, g_spin_angle * 3.0f, 0}, mi_tr_set_euler);
+        if (!any_spin && g_spin_angle != 0.f) {
+            /* всё выключено - один раз возвращаем нейтральный поворот */
+            if (body)   fn_tr_set_euler(body,   (Vec3){0, 0, 0}, mi_tr_set_euler);
+            if (head)   fn_tr_set_euler(head,   (Vec3){0, 0, 0}, mi_tr_set_euler);
+            if (shicka) fn_tr_set_euler(shicka, (Vec3){0, 0, 0}, mi_tr_set_euler);
+            g_spin_angle = 0.f;
+        }
+    }
+
+    /* РЕЗИНОВЫЙ МЕДВЕДЬ: squash-and-stretch всего тела */
+    if (g_api->get_bool(g_id, "jelly", 0) && body && fn_tr_set_scale) {
+        g_jelly_t += 10.f * dt;
+        float p = sinf(g_jelly_t) * 0.3f;
+        fn_tr_set_scale(body, (Vec3){1.f - p, 1.f + p * 1.3f, 1.f - p}, mi_tr_set_scale);
+    }
+
+    /* ДИСКО-НЕБО: трёхцветный ambient радугой */
+    if (g_api->get_bool(g_id, "disco_sky", 0) && fn_set_sky) {
+        double spd = g_api->get_float(g_id, "disco_speed", 2.0);
+        g_disco_hue += 0.15f * (float)spd * dt;
+        if (g_disco_hue > 1.f) g_disco_hue -= 1.f;
+        Color sky = hsv2rgb(g_disco_hue);
+        if (fn_set_equator) fn_set_equator(hsv2rgb(g_disco_hue + 0.08f), mi_set_equator);
+        if (fn_set_ground)  fn_set_ground (hsv2rgb(g_disco_hue + 0.16f), mi_set_ground);
+        fn_set_sky(sky, mi_set_sky);
+    }
+}
+
+/* фиолетовая полоса = у TrailRenderer нет материала (Unity рисует маджентой).
+   Делаем клон skinMaterial игрока и меняем шейдер на Sprites/Default:
+   он умножает цвет вершин (startColor/endColor трейла) и не требует света.
+   Если шейдер не найден в билде игры - останется клон скина (трейл цвета медведя). */
+static void* make_trail_material(void* cosmetics) {
+    void* skin = *(void**)((char*)cosmetics + 0x20);
+    if (!skin || !fn_object_instantiate) return skin;
+    void* mat = fn_object_instantiate(skin, mi_object_instantiate);
+    if (mat && fn_shader_find && fn_mat_setshader) {
+        void* name = bearite_il2.string_new("Sprites/Default");
+        void* sh = (name && fn_shader_find) ? fn_shader_find(name, mi_shader_find) : 0;
+        if (sh) fn_mat_setshader(mat, sh, mi_mat_setshader);
+    }
+    return mat ? mat : skin;
 }
 
 static void ensure_trail(void* player) {
     if (!fn_get_gameobject || !g_trail_type) return;
+    /* переполучаем ссылку периодически: объект мог быть уничтожен при смене уровня/комнаты */
     if (g_trail && (g_tick % 256) != 0) return;
     void* go = fn_get_gameobject(player, mi_get_gameobject);
     if (!go) return;
@@ -83,8 +190,9 @@ static void visuals_tick(void* player, float dt) {
     int    chroma_on  = g_api->get_bool(g_id, "enable_chroma", 0);
     int    trail_on   = g_api->get_bool(g_id, "enable_trail", 1);
     double chroma_spd = g_api->get_float(g_id, "chroma_speed", 2.0);
-    void* cosmetics = *(void**)((char*)player + 0x150);   
+    void* cosmetics = *(void**)((char*)player + 0x150);   /* BearCosmetics */
 
+    /* хрома-скин: красим skinMaterial и shickaMaterial игрока */
     if (chroma_on && cosmetics && fn_set_color) {
         g_hue += 0.15f * (float)chroma_spd * dt;
         if (g_hue > 1.f) g_hue -= 1.f;
@@ -95,8 +203,18 @@ static void visuals_tick(void* player, float dt) {
         if (m2) fn_set_color(m2, c, mi_set_color);
     }
 
+    crazy_tick(cosmetics, dt);
+
     if (trail_on) {
         ensure_trail(player);
+        if (g_trail && !g_trail_mat_done && cosmetics && fn_trail_setmaterial) {
+            void* mat = make_trail_material(cosmetics);
+            if (mat) {
+                fn_trail_setmaterial(g_trail, mat, mi_trail_setmaterial);
+                g_api->log(g_id, "FishVisuals: material assigned to trail");
+            }
+            g_trail_mat_done = 1;
+        }
         if (g_trail) {
             float t = (float)g_api->get_float(g_id, "trail_time", 1.0);
             float w = (float)g_api->get_float(g_id, "trail_width", 0.5);
@@ -118,15 +236,22 @@ static void hk_after_update(void* self, float dt, const void* mi) {
     orig_after_update(self, dt, mi);
     if (!self) return;
     g_tick++;
-    if (*(uint8_t*)((char*)self + 0x138) == 0) return; 
+    if (*(uint8_t*)((char*)self + 0x138) == 0) return;   /* только локальный игрок */
     visuals_tick(self, dt);
 }
 
 static void (*orig_set_fov)(void*, float, const void*);
 
+static float g_fov_t;
+
 static void hk_set_fov(void* self, float value, const void* mi) {
-    if (g_api->get_bool(g_id, "enable_fov", 0))
+    if (g_api->get_bool(g_id, "drunk_fov", 0)) {
+        g_fov_t += 0.016f;
+        float base = (float)g_api->get_float(g_id, "custom_fov", 75.0);
+        value = base + sinf(g_fov_t * 2.1f) * 14.f + sinf(g_fov_t * 5.7f) * 5.f;
+    } else if (g_api->get_bool(g_id, "enable_fov", 0)) {
         value = (float)g_api->get_float(g_id, "custom_fov", 75.0);
+    }
     orig_set_fov(self, value, mi);
 }
 
@@ -153,6 +278,15 @@ void bearite_mod_init(const BeariteApi* api, const char* mod_id) {
     mi_trail_endwidth   = bearite_find_method("UnityEngine", "TrailRenderer", "set_endWidth", 1);
     mi_trail_startcolor = bearite_find_method("UnityEngine", "TrailRenderer", "set_startColor", 1);
     mi_trail_endcolor   = bearite_find_method("UnityEngine", "TrailRenderer", "set_endColor", 1);
+    mi_shader_find       = bearite_find_method("UnityEngine", "Shader",   "Find", 1);
+    mi_object_instantiate= bearite_find_method("UnityEngine", "Object",   "Instantiate", 1);
+    mi_mat_setshader     = bearite_find_method("UnityEngine", "Material", "set_shader", 1);
+    mi_trail_setmaterial = bearite_find_method("UnityEngine", "Renderer", "set_material", 1);
+    mi_tr_set_euler  = bearite_find_method("UnityEngine", "Transform", "set_localEulerAngles", 1);
+    mi_tr_set_scale  = bearite_find_method("UnityEngine", "Transform", "set_localScale", 1);
+    mi_set_sky       = bearite_find_method("UnityEngine", "RenderSettings", "set_ambientSkyColor", 1);
+    mi_set_equator   = bearite_find_method("UnityEngine", "RenderSettings", "set_ambientEquatorColor", 1);
+    mi_set_ground    = bearite_find_method("UnityEngine", "RenderSettings", "set_ambientGroundColor", 1);
 
     fn_set_color        = (set_color_fn)bearite_method_code(mi_set_color);
     fn_get_gameobject   = (get_obj_fn)bearite_method_code(mi_get_gameobject);
@@ -163,6 +297,15 @@ void bearite_mod_init(const BeariteApi* api, const char* mod_id) {
     fn_trail_endwidth   = (set_float_fn)bearite_method_code(mi_trail_endwidth);
     fn_trail_startcolor = (set_color_fn)bearite_method_code(mi_trail_startcolor);
     fn_trail_endcolor   = (set_color_fn)bearite_method_code(mi_trail_endcolor);
+    fn_shader_find       = (shader_find_fn)bearite_method_code(mi_shader_find);
+    fn_object_instantiate= (instantiate_fn)bearite_method_code(mi_object_instantiate);
+    fn_mat_setshader     = (set_shader_fn)bearite_method_code(mi_mat_setshader);
+    fn_trail_setmaterial = (set_material_fn)bearite_method_code(mi_trail_setmaterial);
+    fn_tr_set_euler  = (tr_vec3_fn)bearite_method_code(mi_tr_set_euler);
+    fn_tr_set_scale  = (tr_vec3_fn)bearite_method_code(mi_tr_set_scale);
+    fn_set_sky       = (set_ambient_fn)bearite_method_code(mi_set_sky);
+    fn_set_equator   = (set_ambient_fn)bearite_method_code(mi_set_equator);
+    fn_set_ground    = (set_ambient_fn)bearite_method_code(mi_set_ground);
 
     void* trail_klass = bearite_find_class("UnityEngine", "TrailRenderer");
     if (trail_klass && il_class_get_type && il_type_get_object)
@@ -174,7 +317,7 @@ void bearite_mod_init(const BeariteApi* api, const char* mod_id) {
              (void*)fn_set_color, (void*)g_trail_type);
     api->log(mod_id, msg);
 
-    bearite_hook_method(api, mod_id, "", "PlayerBearController", "AfterCharacterUpdate", 1,
+ bearite_hook_method(api, mod_id, "", "PlayerBearController", "AfterCharacterUpdate", 1,
                         (void*)hk_after_update, (void**)&orig_after_update);
     bearite_hook_method(api, mod_id, "UnityEngine", "Camera", "set_fieldOfView", 1,
                         (void*)hk_set_fov, (void**)&orig_set_fov);
