@@ -1,13 +1,19 @@
 {
   "id": "fish-visuals",
   "name": "FishVisuals",
-  "version": "1.0",
+  "version": "1.16.1",
   "author": "Normal48",
-  "description": "Визуалы: хрома-скин, трейл, FOV. А еще я рыбу не люблю",
+  "description": "Визуалы: хрома, трейл, FOV, небо, slo-mo, безумие, кинокамера, спутники, цветокор, цветной свет",
   "libs": [
     "libs/arm64-v8a/libfishvisuals.so"
   ],
   "settings": [
+    {
+      "id": "selftest",
+      "type": "bool",
+      "name": "!!! SELFTEST (форсит красную хрому/зелёный трейл/голову/FOV)",
+      "default": false
+    },
     {
       "id": "enable_chroma",
       "type": "bool",
@@ -22,6 +28,12 @@
       "max": 5.0,
       "default": 2.0,
       "control": "slider"
+    },
+    {
+      "id": "chroma_strobe",
+      "type": "bool",
+      "name": "Стробоскоп хромы",
+      "default": false
     },
     {
       "id": "enable_trail",
@@ -61,6 +73,12 @@
       "control": "slider"
     },
     {
+      "id": "trail_smooth",
+      "type": "bool",
+      "name": "Плавный трейл",
+      "default": true
+    },
+    {
       "id": "enable_fov",
       "type": "bool",
       "name": "Свой FOV",
@@ -73,6 +91,36 @@
       "min": 60.0,
       "max": 110.0,
       "default": 75.0,
+      "control": "slider"
+    },
+    {
+      "id": "dyn_fov",
+      "type": "bool",
+      "name": "Динамический FOV (от скорости)",
+      "default": false
+    },
+    {
+      "id": "dyn_fov_max",
+      "type": "float",
+      "name": "Макс. прибавка FOV",
+      "min": 5.0,
+      "max": 40.0,
+      "default": 20.0,
+      "control": "slider"
+    },
+    {
+      "id": "enable_aspect",
+      "type": "bool",
+      "name": "Свой Aspect Ratio",
+      "default": false
+    },
+    {
+      "id": "aspect_value",
+      "type": "float",
+      "name": "Aspect (1.78 = 16:9)",
+      "min": 0.5,
+      "max": 2.5,
+      "default": 1.7778,
       "control": "slider"
     },
     {
@@ -89,18 +137,6 @@
       "max": 5.0,
       "default": 2.5,
       "control": "slider"
-    },
-    {
-      "id": "body_spin",
-      "type": "bool",
-      "name": "Крутить тело",
-      "default": false
-    },
-    {
-      "id": "head_spin",
-      "type": "bool",
-      "name": "Голова-экзорциста",
-      "default": false
     },
     {
       "id": "shicka_copter",
@@ -124,6 +160,29 @@
       "default": false
     },
     {
+      "id": "sky_preset",
+      "type": "choice",
+      "name": "Пресет неба",
+      "default": "off",
+      "options": [
+        "off",
+        "sunset",
+        "night",
+        "blood",
+        "ocean",
+        "mint"
+      ]
+    },
+    {
+      "id": "sky_intensity",
+      "type": "float",
+      "name": "Яркость неба",
+      "min": 0.1,
+      "max": 2.0,
+      "default": 1.0,
+      "control": "slider"
+    },
+    {
       "id": "disco_sky",
       "type": "bool",
       "name": "Диско-небо",
@@ -139,92 +198,372 @@
       "control": "slider"
     },
     {
+      "id": "sky_pulse",
+      "type": "bool",
+      "name": "Пульс неба",
+      "default": false
+    },
+    {
       "id": "drunk_fov",
       "type": "bool",
       "name": "Пьяный FOV",
       "default": false
+    },
+    {
+      "id": "beauty_mode",
+      "type": "bool",
+      "name": "РЕЖИМ КРАСОТЫ",
+      "default": false
+    },
+    {
+      "id": "enable_timescale",
+      "type": "bool",
+      "name": "Слоу-мо / ускорение",
+      "default": false
+    },
+    {
+      "id": "timescale_value",
+      "type": "float",
+      "name": "TimeScale (1.0 = норма)",
+      "min": 0.3,
+      "max": 3.0,
+      "default": 1.0,
+      "control": "slider"
+    },
+    {
+      "id": "time_pulse",
+      "type": "bool",
+      "name": "Пульс времени",
+      "default": false
+    },
+    {
+      "id": "time_pulse_amp",
+      "type": "float",
+      "name": "Амплитуда пульса",
+      "min": 0.1,
+      "max": 0.6,
+      "default": 0.25,
+      "control": "slider"
+    },
+    {
+      "id": "cine_radius",
+      "type": "float",
+      "name": "Радиус орбиты",
+      "min": 2.0,
+      "max": 15.0,
+      "default": 6.0,
+      "control": "slider"
+    },
+    {
+      "id": "cine_height",
+      "type": "float",
+      "name": "Высота камеры",
+      "min": 0.0,
+      "max": 10.0,
+      "default": 2.5,
+      "control": "slider"
+    },
+    {
+      "id": "cine_speed",
+      "type": "float",
+      "name": "Скорость облёта",
+      "min": 0.1,
+      "max": 5.0,
+      "default": 0.6,
+      "control": "slider"
+    },
+    {
+      "id": "cam_mode",
+      "type": "choice",
+      "name": "Режим камеры",
+      "default": "off",
+      "options": [
+        "off",
+        "orbit",
+        "retro"
+      ]
+    },
+    {
+      "id": "cam_lerp",
+      "type": "float",
+      "name": "Плавность камеры",
+      "min": 1.0,
+      "max": 20.0,
+      "default": 6.0,
+      "control": "slider"
+    },
+    {
+      "id": "orbit_fx",
+      "type": "choice",
+      "name": "Спутники вокруг игрока",
+      "default": "off",
+      "options": [
+        "off",
+        "bubbles",
+        "bees",
+        "hearts",
+        "stars",
+        "rainbow"
+      ]
+    },
+    {
+      "id": "orbit_count",
+      "type": "float",
+      "name": "Кол-во спутников",
+      "min": 1.0,
+      "max": 8.0,
+      "default": 4.0,
+      "control": "slider"
+    },
+    {
+      "id": "orbit_radius",
+      "type": "float",
+      "name": "Радиус орбиты спутников",
+      "min": 0.5,
+      "max": 4.0,
+      "default": 1.5,
+      "control": "slider"
+    },
+    {
+      "id": "color_grade",
+      "type": "choice",
+      "name": "Цветокоррекция",
+      "default": "off",
+      "options": [
+        "off",
+        "flat",
+        "unlit",
+        "solid"
+      ]
+    },
+    {
+      "id": "light_tint",
+      "type": "choice",
+      "name": "Цветной свет (лампы сцены)",
+      "default": "off",
+      "options": [
+        "off",
+        "fire",
+        "ice",
+        "rose",
+        "rainbow"
+      ]
+    },
+    {
+      "id": "fog_on",
+      "type": "bool",
+      "name": "Туман",
+      "default": false
+    },
+    {
+      "id": "fov_pulse",
+      "type": "bool",
+      "name": "Пульс FOV",
+      "default": false
+    },
+    {
+      "id": "fov_pulse_amp",
+      "type": "float",
+      "name": "Амплитуда пульса FOV",
+      "min": 1.0,
+      "max": 20.0,
+      "default": 6.0,
+      "control": "slider"
+    },
+    {
+      "id": "world_roll",
+      "type": "float",
+      "name": "Крен мира (0 = off)",
+      "min": -45.0,
+      "max": 45.0,
+      "default": 0.0,
+      "control": "slider"
+    },
+    {
+      "id": "cam_shake",
+      "type": "float",
+      "name": "Тряска камеры (0 = off)",
+      "min": 0.0,
+      "max": 3.0,
+      "default": 0.0,
+      "control": "slider"
+    },
+    {
+      "id": "cam_yaw",
+      "type": "float",
+      "name": "Ретро: угол камеры",
+      "min": -180.0,
+      "max": 180.0,
+      "default": 0.0,
+      "control": "slider"
+    },
+    {
+      "id": "cam_dist",
+      "type": "float",
+      "name": "Ретро: дистанция",
+      "min": 2.0,
+      "max": 15.0,
+      "default": 6.0,
+      "control": "slider"
+    },
+    {
+      "id": "cam_height",
+      "type": "float",
+      "name": "Ретро: высота",
+      "min": 0.5,
+      "max": 10.0,
+      "default": 3.0,
+      "control": "slider"
+    },
+    {
+      "id": "sun_glare",
+      "type": "bool",
+      "name": "Солнце (блик на небе)",
+      "default": false
+    },
+    {
+      "id": "sun_size",
+      "type": "float",
+      "name": "Размер солнца",
+      "min": 10.0,
+      "max": 200.0,
+      "default": 60.0,
+      "control": "slider"
+    },
+    {
+      "id": "sun_color",
+      "type": "choice",
+      "name": "Цвет солнца",
+      "default": "warm",
+      "options": [
+        "warm",
+        "yellow",
+        "orange",
+        "white"
+      ]
+    },
+    {
+      "id": "sun_yaw",
+      "type": "float",
+      "name": "Солнце: направление (град)",
+      "min": 0.0,
+      "max": 360.0,
+      "default": 45.0,
+      "control": "slider"
+    },
+    {
+      "id": "sun_height",
+      "type": "float",
+      "name": "Солнце: высота (град)",
+      "min": 5.0,
+      "max": 85.0,
+      "default": 45.0,
+      "control": "slider"
+    },
+    {
+      "id": "boss_text",
+      "type": "string",
+      "name": "Текст вместо имени босса (пусто = off)",
+      "default": ""
+    },
+    {
+      "id": "boss_name_color",
+      "type": "choice",
+      "name": "Цвет имени босса",
+      "default": "off",
+      "options": [
+        "off",
+        "red",
+        "orange",
+        "gold",
+        "green",
+        "cyan",
+        "blue",
+        "purple",
+        "pink",
+        "white",
+        "black"
+      ]
+    },
+    {
+      "id": "shicka_text",
+      "type": "string",
+      "name": "Текст подсказок Шики (пусто = off)",
+      "default": ""
+    },
+    {
+      "id": "jelly_strength",
+      "type": "float",
+      "name": "Сила желе",
+      "min": 0.05,
+      "max": 0.7,
+      "default": 0.25,
+      "control": "slider"
+    },
+    {
+      "id": "ambient_fx",
+      "type": "choice",
+      "name": "Атмосфера вокруг игрока",
+      "default": "off",
+      "options": [
+        "off",
+        "snow",
+        "petals",
+        "fireflies",
+        "rain"
+      ]
+    },
+    {
+      "id": "ambient_density",
+      "type": "float",
+      "name": "Атмосфера: плотность (частиц за тик)",
+      "min": 1.0,
+      "max": 12.0,
+      "default": 3.0,
+      "control": "slider"
+    },
+    {
+      "id": "ambient_size",
+      "type": "float",
+      "name": "Атмосфера: размер частиц",
+      "min": 0.2,
+      "max": 4.0,
+      "default": 1.0,
+      "control": "slider"
+    },
+    {
+      "id": "shicka_text_color",
+      "type": "choice",
+      "name": "Цвет текста Шики",
+      "default": "white",
+      "options": [
+        "white",
+        "gold",
+        "red",
+        "orange",
+        "green",
+        "cyan",
+        "blue",
+        "purple",
+        "pink",
+        "rainbow"
+      ]
+    },
+    {
+      "id": "gold_marker",
+      "type": "bool",
+      "name": "Золотой маркер над головой",
+      "default": false
+    },
+    {
+      "id": "marker_height",
+      "type": "float",
+      "name": "Маркер: высота",
+      "min": 0.8,
+      "max": 5.0,
+      "default": 1.5,
+      "control": "slider"
     }
   ],
-  "hud": [
-    {
-      "label": "Хрома",
-      "setting": "enable_chroma",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Трейл",
-      "setting": "enable_trail",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Текстура",
-      "setting": "trail_texture",
-      "action": "cycle",
-      "pos": "right"
-    },
-    {
-      "label": "FOV",
-      "setting": "enable_fov",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "FOV+",
-      "setting": "custom_fov",
-      "action": "step",
-      "step": 5,
-      "pos": "right"
-    },
-    {
-      "label": "FOV-",
-      "setting": "custom_fov",
-      "action": "step",
-      "step": -5,
-      "pos": "right"
-    },
-    {
-      "label": "Голова",
-      "setting": "big_head",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Спин",
-      "setting": "body_spin",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Экзорц.",
-      "setting": "head_spin",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Шика",
-      "setting": "shicka_copter",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Желе",
-      "setting": "jelly",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Диско",
-      "setting": "disco_sky",
-      "action": "toggle",
-      "pos": "right"
-    },
-    {
-      "label": "Пьяный",
-      "setting": "drunk_fov",
-      "action": "toggle",
-      "pos": "right"
-    }
-  ]
+  "hud": []
 }
